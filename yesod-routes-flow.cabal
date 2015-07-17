@@ -5,7 +5,7 @@ description:         Parse the Yesod routes data structure and generate routes t
 homepage:            https://github.com/frontrowed/yesod-routes-flow
 license:             MIT
 license-file:        LICENSE
-author:              Max Cantor
+author:              Max Cantor, Felipe Lessa
 maintainer:          Greg Weber <greg@frontrowed.com>
 -- copyright:
 category:            Web
