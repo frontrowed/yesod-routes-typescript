@@ -9,7 +9,7 @@ import Data.Function (on)
 import Data.Text (dropWhileEnd)
 import qualified Data.Text as DT
 import Filesystem (createTree)
-import Data.Char (isUpper)
+import qualified Data.Char as DC
 import Yesod.Routes.TH.Types
     -- ( ResourceTree(..),
     --   Piece(Dynamic, Static),
@@ -46,8 +46,12 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         -- if routePrefixes is empty, include all routes
         filter (\n -> routePrefixes == [] || any (parentName n) routePrefixes) fullTree
     hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
-    cleanName = uncapitalize . dropWhileEnd isUpper
+    cleanName = underscorize . uncapitalize . dropWhileEnd DC.isUpper
       where uncapitalize t = (toLower $ take 1 t) <> drop 1 t
+            underscorize = DT.pack . go . DT.unpack
+              where go (c:cs) | DC.isUpper c = '_' : DC.toLower c : go cs
+                              | otherwise    =  c                 : go cs
+                    go [] = []
 
     renderRoutePieces pieces = intercalate "/" $ map renderRoutePiece pieces
     renderRoutePiece p = case p of
