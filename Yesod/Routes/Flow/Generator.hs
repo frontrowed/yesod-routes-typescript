@@ -74,7 +74,7 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
                 Subsite _ _ -> [] -- silently ignore subsites
                 Methods _ [] -> error "no methods!"
                 Methods _ methods ->
-                    let resName = DT.replace "." "" $ lastName res
+                    let resName = DT.replace "." "" $ DT.replace "-" "_" $ lastName res
                         -- we basically never will want to refer to OPTIONS
                         -- routes directly
                         callableMeths = filter (\a -> a /= "OPTIONS") methods in
