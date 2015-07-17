@@ -123,10 +123,12 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         memberLinkFromParent (slot, klass) = "" <> slot <> ": " <> klass <> ";"
         linkFromParent = (pref, resourceClassName)
         resourceClassDef = "class " <>  resourceClassName  <> " {\n"
+          <> "  " <> "root: string;\n"
           <> intercalate "\n" childMembers
           <> "  " <> parentMembers memberLinkFromParent
-          <> "\n\n"
-          <> "  constructor(root: string){\n  "
+          <> "\n"
+          <> "  constructor(root: string){\n"
+          <> "    this.root = root;\n"
           <> parentMembers memberInitFromParent
           <> "\n  }\n"
           <> "}\n\n"
