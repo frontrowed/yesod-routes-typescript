@@ -1,6 +1,6 @@
-module Yesod.Routes.Typescript.Generator
-    ( genTypeScriptRoutesPrefix
-    , genTypeScriptRoutes
+module Yesod.Routes.Flow.Generator
+    ( genFlowRoutesPrefix
+    , genFlowRoutes
     ) where
 
 import ClassyPrelude
@@ -10,54 +10,52 @@ import Data.Text (dropWhileEnd)
 import qualified Data.Text as DT
 import Filesystem (createTree)
 import Data.Char (isUpper)
-import Yesod.Routes.TH
+import Yesod.Routes.TH.Types
     -- ( ResourceTree(..),
     --   Piece(Dynamic, Static),
     --   FlatResource,
     --   Resource(resourceDispatch, resourceName, resourcePieces),
     --   Dispatch(Methods, Subsite) )
 
--- Import all relevant handler modules here.
--- Don't forget to add new modules to your cabal file!
 
-genTypeScriptRoutes :: [ResourceTree String] -> FilePath -> IO ()
-genTypeScriptRoutes ra fp = genTypeScriptRoutesPrefix [] [] ra fp "''"
+genFlowRoutes :: [ResourceTree String] -> FilePath -> IO ()
+genFlowRoutes ra fp = genFlowRoutesPrefix [] [] ra fp "''"
 
-genTypeScriptRoutesPrefix :: [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
-genTypeScriptRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
+genFlowRoutesPrefix :: [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
+genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
     createTree $ directory fp
     writeFile fp routesCs
   where
     routesCs =
-        let res = (resToCoffeeString Nothing "" $ ResourceParent "paths" [] hackedTree)
+        let res = (resToCoffeeString Nothing "" $ ResourceParent "paths" False [] hackedTree)
         in  "/* jshint -W003 */\n" <>
             either id id (snd res)
-            <> "\nvar PATHS:PATHS_TYPE_paths = new PATHS_TYPE_paths("<>prefix<>");"
+            <> "\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths("<>prefix<>");"
             <> "\n/* jshint +W003 */\n"
 
     -- route hackery..
     fullTree = resourcesApp :: [ResourceTree String]
     landingRoutes = flip filter fullTree $ \case
-        ResourceParent _ _ _ -> False
+        ResourceParent _ _ _ _ -> False
         ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
 
     parentName :: ResourceTree String -> String -> Bool
-    parentName (ResourceParent n _ _) name = n == name
+    parentName (ResourceParent n _ _ _) name = n == name
     parentName _ _  = False
 
     parents =
         -- if routePrefixes is empty, include all routes
         filter (\n -> routePrefixes == [] || any (parentName n) routePrefixes) fullTree
-    hackedTree = ResourceParent "staticPages" [] landingRoutes : parents
+    hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
     cleanName = uncapitalize . dropWhileEnd isUpper
       where uncapitalize t = (toLower $ take 1 t) <> drop 1 t
 
     renderRoutePieces pieces = intercalate "/" $ map renderRoutePiece pieces
     renderRoutePiece p = case p of
-        (_, Static st) -> pack st :: Text
-        (_, Dynamic "Text") -> ":string"
-        (_, Dynamic "Int") -> ":number"
-        (_, Dynamic d) -> ":string"
+        Static st      -> pack st :: Text
+        Dynamic "Text" -> ": string"
+        Dynamic "Int"  -> ": number"
+        Dynamic d      -> ": string"
     isVariable r = length r > 1 && DT.head r == ':'
     resRoute res = renderRoutePieces $ resourcePieces res
     resName res = cleanName . pack $ resourceName res
@@ -90,7 +88,7 @@ genTypeScriptRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = 
         variables = snd $ foldl' (\(i,prev) typ -> (i+1, prev <> [("a" <> tshow i, typ)]))
                              (0::Int, [])
                              (filter isVariable  pieces)
-        mkLine jsName = "  public " <> jsName <> "("
+        mkLine jsName = "  " <> jsName <> "("
           <> csvArgs variables
           <> "):string { "
           -- <> presenceChk
@@ -108,35 +106,35 @@ genTypeScriptRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = 
         quote str = "'" <> str <> "'"
         routeString = singleSlash routePrefix <> resRoute res
 
-    -- this is here because in the typescript code, we dont refer to
-    -- PATHS.api.doc.foo but PATHS.doc.foobar.  so we can keep our route
-    -- orgazniation in place but also leave TS alone
-    resToCoffeeString parent routePrefix (ResourceParent name pieces children) | name `elem` elidedPrefixes =
+    -- This is here because in the Flow code, we dont refer to
+    -- PATHS.api.doc.foo but PATHS.doc.foobar.  So we can keep our route
+    -- organization in place but also leave Flow alone.
+    resToCoffeeString parent routePrefix (ResourceParent name _ pieces children) | name `elem` elidedPrefixes =
         (concatMap fst res, Left $ intercalate "\n" (map (either id id . snd) res))
       where
         fxn = resToCoffeeString parent (routePrefix <> "/" <> renderRoutePieces pieces <> "/")
         res = map fxn children
 
-    resToCoffeeString parent routePrefix (ResourceParent name pieces children) =
+    resToCoffeeString parent routePrefix (ResourceParent name _ pieces children) =
         ([linkFromParent], Left $ resourceClassDef)
       where
         parentMembers f =
-          intercalate "\n  " $ map f $ concatMap fst childTypescript
+          intercalate "\n  " $ map f $ concatMap fst childFlow
         memberInitFromParent (slot, klass) = "  this." <> slot <> " = new " <> klass <> "(root);"
-        memberLinkFromParent (slot, klass) = "public " <> slot <> ": " <> klass <> ";"
+        memberLinkFromParent (slot, klass) = "" <> slot <> ": " <> klass <> ";"
         linkFromParent = (pref, resourceClassName)
         resourceClassDef = "class " <>  resourceClassName  <> " {\n"
           <> intercalate "\n" childMembers
           <> "  " <> parentMembers memberLinkFromParent
           <> "\n\n"
-          <> "  constructor(public root:string){\n  "
+          <> "  constructor(root: string){\n  "
           <> parentMembers memberInitFromParent
           <> "\n  }\n"
           <> "}\n\n"
           <> intercalate "\n" childClasses
-        (childClasses, childMembers) = partitionEithers $ map snd childTypescript
+        (childClasses, childMembers) = partitionEithers $ map snd childFlow
         jsName = maybe "" (<> "_") parent <> pref
-        childTypescript = flip map children $ resToCoffeeString
+        childFlow = flip map children $ resToCoffeeString
                                 (Just jsName)
                                 (routePrefix <> "/" <> renderRoutePieces pieces <> "/")
         pref = cleanName $ pack name
