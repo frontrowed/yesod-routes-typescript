@@ -72,7 +72,7 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         -- now hacking in support
         let jsNames = case resourceDispatch res of
                 Subsite _ _ -> [] -- silently ignore subsites
-                Methods _ [] -> error "no methods!"
+                Methods _ [] -> error "no methods! (never here, check hasMethods)"
                 Methods _ methods ->
                     let resName = DT.replace "." "" $ DT.replace "-" "_" $ lastName res
                         -- we basically never will want to refer to OPTIONS
@@ -135,11 +135,14 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
           <> intercalate "\n" childClasses
         (childClasses, childMembers) = partitionEithers $ map snd childFlow
         jsName = maybe "" (<> "_") parent <> pref
-        childFlow = flip map children $ resToCoffeeString
+        childFlow = flip map (filter hasMethods children) $ resToCoffeeString
                                 (Just jsName)
                                 (routePrefix <> "/" <> renderRoutePieces pieces <> "/")
         pref = cleanName $ pack name
         resourceClassName = "PATHS_TYPE_" <> jsName
+    -- Silently ignore routes without methods.
+    hasMethods (ResourceLeaf res) = case resourceDispatch res of { Methods _ [] -> False; _ -> True}
+    hasMethods _                  = True
 
 deriving instance (Show a) => Show (ResourceTree a)
 deriving instance (Show a) => Show (FlatResource a)
