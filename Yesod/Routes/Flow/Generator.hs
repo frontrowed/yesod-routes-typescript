@@ -62,15 +62,10 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
     isVariable r = length r > 1 && DT.head r == ':'
     resRoute res = renderRoutePieces $ resourcePieces res
     resName res = cleanName . pack $ resourceName res
-    lastName res = fromMaybe (resName res)
-                 . find (not . isVariable)
-                 . map renderRoutePiece
-                 . reverse
-                 . resourcePieces
-                 $ res
+    fullName res = intercalate "_" [pack st :: Text | Static st <- resourcePieces res]
     singleSlash = DT.replace "//" "/"
     resToCoffeeString :: Maybe Text -> Text -> ResourceTree String -> ([(Text, Text)], Either Text Text)
-    resToCoffeeString _ routePrefix (ResourceLeaf res) =
+    resToCoffeeString parent routePrefix (ResourceLeaf res) =
         let rname = resName res in
         -- previously assumed there weren't multiple methods per route path
         -- now hacking in support
@@ -78,12 +73,13 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
                 Subsite _ _ -> [] -- silently ignore subsites
                 Methods _ [] -> error "no methods! (never here, check hasMethods)"
                 Methods _ methods ->
-                    let resName = DT.replace "." "" $ DT.replace "-" "_" $ lastName res
+                    let resName = DT.replace "." "" $ DT.replace "-" "_" $ fullName res
+                        prefix = if resName == "" then "" else resName <> "_"
                         -- we basically never will want to refer to OPTIONS
                         -- routes directly
                         callableMeths = filter (\a -> a /= "OPTIONS") methods in
-                    if length callableMeths > 1 || rname == ""
-                        then map (((resName <> "_") <>) . toLower . pack) callableMeths
+                    if length callableMeths > 1 || resName == ""
+                        then map ((prefix <>) . toLower . pack) callableMeths
                         else [resName]
         in ([], Right $ intercalate "\n" $ map mkLine jsNames)
       where
