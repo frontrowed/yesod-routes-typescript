@@ -72,7 +72,7 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         -- previously assumed there weren't multiple methods per route path
         -- now hacking in support
         let jsNames = case resourceDispatch res of
-                Subsite _ _ -> error "subsite!"
+                Subsite _ _ -> [] -- silently ignore subsites
                 Methods _ [] -> error "no methods!"
                 Methods _ methods ->
                     let resName = DT.replace "." "" $ lastName res
