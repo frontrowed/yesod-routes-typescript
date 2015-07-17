@@ -28,10 +28,9 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
   where
     routesCs =
         let res = (resToCoffeeString Nothing "" $ ResourceParent "paths" False [] hackedTree)
-        in  "/* jshint -W003 */\n" <>
+        in  "/* @flow */\n" <>
             either id id (snd res)
-            <> "\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths("<>prefix<>");"
-            <> "\n/* jshint +W003 */\n"
+            <> "\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths("<>prefix<>");\n"
 
     -- route hackery..
     fullTree = resourcesApp :: [ResourceTree String]
@@ -90,7 +89,7 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
                              (filter isVariable  pieces)
         mkLine jsName = "  " <> jsName <> "("
           <> csvArgs variables
-          <> "):string { "
+          <> "): string { "
           -- <> presenceChk
           <> "return this.root + " <> quote (routeStr variables variablePieces) <> "; }"
         routeStr vars ((Left p):rest) | null p    = routeStr vars rest
