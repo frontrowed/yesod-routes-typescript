@@ -128,7 +128,7 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
           <> "  " <> parentMembers memberLinkFromParent
           <> "\n"
           <> "  constructor(root: string){\n"
-          <> "    this.root = root;\n"
+          <> "    this.root = root;\n  "
           <> parentMembers memberInitFromParent
           <> "\n  }\n"
           <> "}\n\n"
