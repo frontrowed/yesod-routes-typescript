@@ -3,12 +3,13 @@ module Yesod.Routes.Flow.Generator
     , genFlowRoutes
     ) where
 
-import ClassyPrelude
+import ClassyPrelude hiding (FilePath)
 import Data.List (nubBy)
 import Data.Function (on)
 import Data.Text (dropWhileEnd)
 import qualified Data.Text as DT
-import Filesystem (createTree)
+import Filesystem (createTree, writeTextFile)
+import Filesystem.Path (FilePath, directory)
 import qualified Data.Char as DC
 import Yesod.Routes.TH.Types
     -- ( ResourceTree(..),
@@ -24,7 +25,7 @@ genFlowRoutes ra fp = genFlowRoutesPrefix [] [] ra fp "''"
 genFlowRoutesPrefix :: [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
 genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
     createTree $ directory fp
-    writeFile fp routesCs
+    writeTextFile fp routesCs
   where
     routesCs =
         let res = (resToCoffeeString Nothing "" $ ResourceParent "paths" False [] hackedTree)

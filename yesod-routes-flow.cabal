@@ -1,5 +1,5 @@
 name:                yesod-routes-flow
-version:             1.0
+version:             1.0.1
 synopsis:            Generate Flow routes for Yesod
 description:         Parse the Yesod routes data structure and generate routes that can be used with Flow.
 homepage:            https://github.com/frontrowed/yesod-routes-flow
@@ -37,6 +37,7 @@ library
                         base < 5,
                         classy-prelude >= 0.7,
                         system-fileio,
+                        system-filepath >= 0.4,
                         text,
                         yesod-core >= 1.4 && < 2.0
   -- hs-source-dirs:
