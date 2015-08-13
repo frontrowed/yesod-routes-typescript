@@ -1,11 +1,10 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Yesod.Routes.Flow.Generator
     ( genFlowRoutesPrefix
     , genFlowRoutes
     ) where
 
 import ClassyPrelude hiding (FilePath)
-import Data.List (nubBy)
-import Data.Function (on)
 import Data.Text (dropWhileEnd)
 import qualified Data.Text as DT
 import Filesystem (createTree, writeTextFile)
@@ -59,29 +58,27 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         Static st      -> pack st :: Text
         Dynamic "Text" -> ": string"
         Dynamic "Int"  -> ": number"
-        Dynamic d      -> ": string"
+        Dynamic _      -> ": string"
     isVariable r = length r > 1 && DT.head r == ':'
     resRoute res = renderRoutePieces $ resourcePieces res
-    resName res = cleanName . pack $ resourceName res
     fullName res = intercalate "_" [pack st :: Text | Static st <- resourcePieces res]
     singleSlash = DT.replace "//" "/"
     resToCoffeeString :: Maybe Text -> Text -> ResourceTree String -> ([(Text, Text)], Either Text Text)
-    resToCoffeeString parent routePrefix (ResourceLeaf res) =
-        let rname = resName res in
+    resToCoffeeString _parent routePrefix (ResourceLeaf res) =
         -- previously assumed there weren't multiple methods per route path
         -- now hacking in support
         let jsNames = case resourceDispatch res of
                 Subsite _ _ -> [] -- silently ignore subsites
                 Methods _ [] -> error "no methods! (never here, check hasMethods)"
                 Methods _ methods ->
-                    let resName = DT.replace "." "" $ DT.replace "-" "_" $ fullName res
-                        prefix = if resName == "" then "" else resName <> "_"
+                    let resName_ = DT.replace "." "" $ DT.replace "-" "_" $ fullName res
+                        prefix_  = if resName_ == "" then "" else resName_ <> "_"
                         -- we basically never will want to refer to OPTIONS
                         -- routes directly
                         callableMeths = filter (\a -> a /= "OPTIONS") methods in
-                    if length callableMeths > 1 || resName == ""
-                        then map ((prefix <>) . toLower . pack) callableMeths
-                        else [resName]
+                    if length callableMeths > 1 || resName_ == ""
+                        then map ((prefix_ <>) . toLower . pack) callableMeths
+                        else [resName_]
         in ([], Right $ intercalate "\n" $ map mkLine jsNames)
       where
         pieces = DT.splitOn "/" routeString
