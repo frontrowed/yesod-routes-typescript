@@ -53,12 +53,14 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
                               | otherwise    =  c                 : go cs
                     go [] = []
 
+    isNumberType "Int" = True
+    isNumberType type_ = "Id" `isSuffixOf` type_ -- UserId, PageId, PostId, etc.
+
     renderRoutePieces pieces = intercalate "/" $ map renderRoutePiece pieces
     renderRoutePiece p = case p of
-        Static st      -> pack st :: Text
-        Dynamic "Text" -> ": string"
-        Dynamic "Int"  -> ": number"
-        Dynamic _      -> ": string"
+        Static st                          -> pack st :: Text
+        Dynamic type_ | isNumberType type_ -> ": number"
+                      | otherwise          -> ": string"
     isVariable r = length r > 1 && DT.head r == ':'
     resRoute res = renderRoutePieces $ resourcePieces res
     fullName res = intercalate "_" [pack st :: Text | Static st <- resourcePieces res]
