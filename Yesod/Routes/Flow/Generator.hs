@@ -84,9 +84,8 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         in ([], Right $ intercalate "\n" $ map mkLine jsNames)
       where
         pieces = DT.splitOn "/" routeString
-        variables = snd $ foldl' (\(i,prev) typ -> (i+1, prev <> [("a" <> tshow i, typ)]))
-                             (0::Int, [])
-                             (filter isVariable  pieces)
+        variables = zip variableNames (filter isVariable pieces)
+          where variableNames = DT.cons <$> ['a'..'z'] <*> ("" : variableNames)
         mkLine jsName = "  " <> jsName <> "("
           <> csvArgs variables
           <> "): string { "
@@ -122,12 +121,12 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
         memberInitFromParent (slot, klass) = "  this." <> slot <> " = new " <> klass <> "(root);"
         memberLinkFromParent (slot, klass) = "" <> slot <> ": " <> klass <> ";"
         linkFromParent = (pref, resourceClassName)
-        resourceClassDef = "class " <>  resourceClassName  <> " {\n"
-          <> "  " <> "root: string;\n"
-          <> intercalate "\n" childMembers
-          <> "  " <> parentMembers memberLinkFromParent
-          <> "\n"
-          <> "  constructor(root: string){\n"
+        resourceClassDef =
+            "class " <> resourceClassName <> " {\n"
+          <> intercalate "\n" childMembers <> "\n"
+          <> parentMembers memberLinkFromParent <> "\n"
+          <> "  root: string;\n"
+          <> "  constructor(root: string) {\n"
           <> "    this.root = root;\n  "
           <> parentMembers memberInitFromParent
           <> "\n  }\n"
