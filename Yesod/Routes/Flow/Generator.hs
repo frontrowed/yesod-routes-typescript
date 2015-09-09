@@ -67,22 +67,16 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes resourcesApp fp prefix = do
     singleSlash = DT.replace "//" "/"
     resToCoffeeString :: Maybe Text -> Text -> ResourceTree String -> ([(Text, Text)], Either Text Text)
     resToCoffeeString _parent routePrefix (ResourceLeaf res) =
-        -- previously assumed there weren't multiple methods per route path
-        -- now hacking in support
-        let jsNames = case resourceDispatch res of
-                Subsite _ _ -> [] -- silently ignore subsites
-                Methods _ [] -> error "no methods! (never here, check hasMethods)"
-                Methods _ methods ->
-                    let resName_ = DT.replace "." "" $ DT.replace "-" "_" $ fullName res
-                        prefix_  = if resName_ == "" then "" else resName_ <> "_"
-                        -- we basically never will want to refer to OPTIONS
-                        -- routes directly
-                        callableMeths = filter (\a -> a /= "OPTIONS") methods in
-                    if length callableMeths > 1 || resName_ == ""
-                        then map ((prefix_ <>) . toLower . pack) callableMeths
-                        else [resName_]
-        in ([], Right $ intercalate "\n" $ map mkLine jsNames)
+      ([], Right $ intercalate "\n" $ map mkLine jsName)
       where
+        jsName =
+          case resourceDispatch res of
+            Subsite _ _ -> [] -- Silently ignore subsites.
+            Methods _ _ ->
+              -- Don't bother with methods, they get the same route anyway.
+              -- Use "_" for the root.
+              let resName_ = DT.replace "." "" $ DT.replace "-" "_" $ fullName res
+              in [if null resName_ then "_" else resName_]
         pieces = DT.splitOn "/" routeString
         variables = zip variableNames (filter isVariable pieces)
           where variableNames = DT.cons <$> ['a'..'z'] <*> ("" : variableNames)
