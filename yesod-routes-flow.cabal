@@ -38,6 +38,7 @@ library
                         classy-prelude >= 0.7,
                         system-fileio,
                         system-filepath >= 0.4,
+                        containers,
                         text,
                         yesod-core >= 1.4 && < 2.0
   -- hs-source-dirs:

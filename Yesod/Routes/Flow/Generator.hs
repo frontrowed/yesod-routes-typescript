@@ -6,16 +6,12 @@ module Yesod.Routes.Flow.Generator
 
 import ClassyPrelude hiding (FilePath)
 import Data.Text (dropWhileEnd)
-import qualified Data.Text as DT
 import Filesystem (createTree, writeTextFile)
 import Filesystem.Path (FilePath, directory)
-import qualified Data.Char as DC
 import Yesod.Routes.TH.Types
-    -- ( ResourceTree(..),
-    --   Piece(Dynamic, Static),
-    --   FlatResource,
-    --   Resource(resourceDispatch, resourceName, resourcePieces),
-    --   Dispatch(Methods, Subsite) )
+import qualified Data.Char as C
+import qualified Data.Map  as M
+import qualified Data.Text as T
 
 
 genFlowRoutes :: [ResourceTree String] -> FilePath -> IO ()
@@ -28,6 +24,7 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes fullTree fp prefix = do
   where
     routesCs =
       let classes =
+            map disambiguateFields $
             resourceTreeToClasses elidedPrefixes $
             ResourceParent "paths" False [] hackedTree
       in    "/* @flow */\n\n"
@@ -47,13 +44,22 @@ parentName :: ResourceTree String -> String -> Bool
 parentName (ResourceParent n _ _ _) name = n == name
 parentName _ _  = False
 
-renderRoutePieces :: [Piece String] -> Text
-renderRoutePieces pieces = intercalate "/" $ map renderRoutePiece pieces
+----------------------------------------------------------------------
+
+data RenderedPiece =
+    Path Text
+  | Number
+  | String
+
+isVariable :: RenderedPiece -> Bool
+isVariable (Path _) = False
+isVariable _        = True
+
+renderRoutePieces :: [Piece String] -> [RenderedPiece]
+renderRoutePieces = map renderRoutePiece
   where
-    renderRoutePiece p = case p of
-        Static st                          -> pack st :: Text
-        Dynamic type_ | isNumberType type_ -> ": number"
-                      | otherwise          -> ": string"
+    renderRoutePiece (Static st)   = Path $ T.dropAround (== '/') $ pack st
+    renderRoutePiece (Dynamic typ) = if isNumberType typ then Number else String
 
     isNumberType "Int" = True
     isNumberType type_ = "Id" `isSuffixOf` type_ -- UserId, PageId, PostId, etc.
@@ -71,42 +77,47 @@ data ClassMember =
     -- | A 'ResourceParent' inside the 'ResourceParent'
     -- that generated this class.
     ChildClass
-      { cmClassName   :: Text           -- ^ Class name of the child class.
-      , cmField       :: Text           -- ^ Field name used to refer to the child class.
+      { cmField     :: Text            -- ^ Field name used to refer to the child class.
+      , cmClassName :: Text            -- ^ Class name of the child class.
       }
     -- | A callable method.
   | Method
-      { cmField       :: Text           -- ^ Field name used to refer to the method.
-      , cmPieces      :: [Piece String] -- ^ Pieces, used for arguments and the method body.
-      , cmRoutePrefix :: Text           -- ^ Route prefix leading to this method.
+      { cmField     :: Text            -- ^ Field name used to refer to the method.
+      , cmPieces    :: [RenderedPiece] -- ^ Pieces to render the route.
       }
+
+variableCount :: ClassMember -> Int
+variableCount ChildClass {} = 0
+variableCount Method {..}   = length (filter isVariable cmPieces)
+
+variableNames :: [Text]
+variableNames = T.cons <$> ['a'..'z'] <*> ("" : variableNames)
 
 ----------------------------------------------------------------------
 
 -- | Create a list of 'Class'es from a 'ResourceTree'.
 resourceTreeToClasses :: [String] -> ResourceTree String -> [Class]
-resourceTreeToClasses elidedPrefixes = finish . go Nothing ""
+resourceTreeToClasses elidedPrefixes = finish . go Nothing []
   where
     finish (Right (_, classes)) = classes
     finish (Left _)             = []
 
-    go :: Maybe Text -> Text -> ResourceTree String -> Either (Maybe ClassMember) ([ClassMember], [Class])
+    go :: Maybe Text -> [RenderedPiece] -> ResourceTree String -> Either (Maybe ClassMember) ([ClassMember], [Class])
     go _parent routePrefix (ResourceLeaf res) =
       Left $ do
         Methods _ methods <- return $ resourceDispatch res -- Ignore subsites.
         guard (not $ null methods) -- Silently ignore routes without methods.
-        let resName  = DT.replace "." "" $ DT.replace "-" "_" fullName
+        let resName  = T.replace "." "" $ T.replace "-" "_" fullName
             fullName = intercalate "_" [pack st :: Text | Static st <- resourcePieces res]
         return Method
           { cmField       = if null fullName then "_" else resName
-          , cmPieces      = resourcePieces res
-          , cmRoutePrefix = routePrefix }
+          , cmPieces      = routePrefix <> renderRoutePieces (resourcePieces res) }
     go parent routePrefix (ResourceParent name _ pieces children) =
       let elideThisPrefix = name `elem` elidedPrefixes
           pref            = cleanName $ pack name
           jsName          = maybe "" (<> "_") parent <> pref
           newParent       = if elideThisPrefix then parent else Just jsName
-          newRoutePrefix  = routePrefix <> "/" <> renderRoutePieces pieces <> "/"
+          newRoutePrefix  = routePrefix <> renderRoutePieces pieces
           membersMethods  = catMaybes childrenMethods
           (childrenMethods, childrenClasses) = partitionEithers $ map (go newParent newRoutePrefix) children
           (membersClasses, moreClasses)      = concat *** concat $ unzip childrenClasses
@@ -125,12 +136,38 @@ resourceTreeToClasses elidedPrefixes = finish . go Nothing ""
              in ([ourReference], ourClass : moreClasses)
 
 cleanName :: Text -> Text
-cleanName = underscorize . uncapitalize . dropWhileEnd DC.isUpper
+cleanName = underscorize . uncapitalize . dropWhileEnd C.isUpper
   where uncapitalize t = (toLower $ take 1 t) <> drop 1 t
-        underscorize = DT.pack . go . DT.unpack
-          where go (c:cs) | DC.isUpper c = '_' : DC.toLower c : go cs
-                          | otherwise    =  c                 : go cs
+        underscorize = T.pack . go . T.unpack
+          where go (c:cs) | C.isUpper c = '_' : C.toLower c : go cs
+                          | otherwise   =  c                : go cs
                 go [] = []
+
+----------------------------------------------------------------------
+
+-- | Disambiguate fields by appending suffixes.
+disambiguateFields :: Class -> Class
+disambiguateFields klass = klass { classMembers = processMembers $ classMembers klass }
+  where
+    processMembers = fromMap . disambiguate viaLetters . disambiguate viaArgCount . toMap
+    fromMap  = concat . M.elems
+    toMap    = M.fromListWith (++) . labelled
+    labelled = map (cmField &&& return)
+    append t = \cm -> cm { cmField = cmField cm <> t cm }
+
+    disambiguate :: ([ClassMember] -> [ClassMember]) -> M.Map Text [ClassMember] -> M.Map Text [ClassMember]
+    disambiguate inner = M.fromListWith (++) . concatMap f . M.toList
+      where
+        f :: (Text, [ClassMember]) -> [(Text, [ClassMember])]
+        f y@(_, [ ]) = [y]
+        f y@(_, [_]) = [y]
+        f   (_, xs ) = labelled $ inner xs
+
+    -- Append the number of arguments.
+    viaArgCount = map $ append (T.pack . show . variableCount)
+
+    -- Append arbitrary letters as a last resort.
+    viaLetters  = zipWith (append . const) variableNames
 
 ----------------------------------------------------------------------
 
@@ -138,23 +175,15 @@ classMemberToFlowDef :: ClassMember -> Text
 classMemberToFlowDef ChildClass {..} = "  " <> cmField <> " : " <> cmClassName <> ";\n"
 classMemberToFlowDef Method {..}     = "  " <> cmField <> "(" <> args <> "): string { " <> body <> "; }\n"
   where
-    args = intercalate ", " $ map (uncurry (<>)) variables
-
-    body = "return this.root + '" <> routeStr variables variablePieces <> "'"
+    args = intercalate ", " $ zipWith render variableNames (filter isVariable cmPieces)
       where
-        variablePieces = map (\p -> if isVariable p then Right p else Left p) pieces
-        routeStr vars ((Left p):rest) | null p    = routeStr vars rest
-                                      | otherwise = "/" <> p <> routeStr vars rest
-        routeStr (v:vars) ((Right _):rest) = "/' + " <> fst v <> ".toString() + '" <> routeStr vars rest
-        routeStr [] [] = ""
-        routeStr _  [] = error "extra vars!"
-        routeStr [] _  = error "no more vars!"
+        render name typ = name <> ": " <> (case typ of { Number -> "number"; String -> "string" })
 
-    routeString  = DT.replace "//" "/" cmRoutePrefix <> renderRoutePieces cmPieces
-    pieces       = DT.splitOn "/" routeString
-    isVariable r = length r > 1 && DT.head r == ':'
-    variables    = zip variableNames (filter isVariable pieces)
-      where variableNames = DT.cons <$> ['a'..'z'] <*> ("" : variableNames)
+    body = "return this.root + '" <> routeStr variableNames cmPieces <> "'"
+      where
+        routeStr vars (Path p:rest) = (if null p then "" else "/" <> p) <> routeStr vars rest
+        routeStr (v:vars)  (_:rest) = "/' + " <> v <> ".toString() + '" <> routeStr vars rest
+        routeStr _         _        = ""
 
 classMemberToFlowInit :: ClassMember -> Text
 classMemberToFlowInit ChildClass {..} = "    this." <> cmField <> " = new " <> cmClassName <> "(root);\n"
