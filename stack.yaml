@@ -1,1 +1,22 @@
-resolver: lts-3.2
+resolver: lts-5.5
+
+packages:
+  - '.'
+  - location:
+      git: git@github.com:frontrowed/yesod.git
+      commit: ac8f0ad47a38e3fdd6520ef743cc941f0a05ac66
+    subdirs:
+      - yesod-core
+      - yesod-static
+      - yesod-persistent
+      - yesod-newsfeed
+      - yesod-form
+      - yesod-auth
+      - yesod-auth-oauth
+      - yesod-sitemap
+      - yesod-test
+      - yesod-bin
+      - yesod
+      - yesod-eventsource
+      - yesod-websockets
+    extra-dep: true

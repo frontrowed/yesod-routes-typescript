@@ -26,22 +26,22 @@ genFlowRoutesPrefix routePrefixes elidedPrefixes fullTree fp prefix = do
       let classes =
             map disambiguateFields $
             resourceTreeToClasses elidedPrefixes $
-            ResourceParent "paths" False [] hackedTree
+            ResourceParent "paths" False [] [] hackedTree
       in    "/* @flow */\n\n"
          <> classesToFlow classes
          <> "\n\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths(" <> prefix <> ");\n"
 
     -- Route hackery.
     landingRoutes = flip filter fullTree $ \case
-        ResourceParent _ _ _ _ -> False
+        ResourceParent _ _ _ _ _ -> False
         ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
     parents =
         -- if routePrefixes is empty, include all routes
         filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
-    hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
+    hackedTree = ResourceParent "staticPages" False [] [] landingRoutes : parents
 
 parentName :: ResourceTree String -> String -> Bool
-parentName (ResourceParent n _ _ _) name = n == name
+parentName (ResourceParent n _ _ _ _) name = n == name
 parentName _ _  = False
 
 ----------------------------------------------------------------------
@@ -112,7 +112,7 @@ resourceTreeToClasses elidedPrefixes = finish . go Nothing []
         return Method
           { cmField       = if null fullName then "_" else resName
           , cmPieces      = routePrefix <> renderRoutePieces (resourcePieces res) }
-    go parent routePrefix (ResourceParent name _ pieces children) =
+    go parent routePrefix (ResourceParent name _ pieces _queries children) =
       let elideThisPrefix = name `elem` elidedPrefixes
           pref            = cleanName $ pack name
           jsName          = maybe "" (<> "_") parent <> pref
