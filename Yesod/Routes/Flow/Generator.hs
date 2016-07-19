@@ -10,6 +10,7 @@ import Filesystem (createTree, writeTextFile)
 import Filesystem.Path (FilePath, directory)
 import Yesod.Routes.TH.Types
 import qualified Data.Char as C
+import qualified Data.List as L
 import qualified Data.Map  as M
 import qualified Data.Text as T
 
@@ -46,23 +47,35 @@ parentName _ _  = False
 
 ----------------------------------------------------------------------
 
-data RenderedPiece =
-    Path Text
-  | Number
+data RenderedPiece
+  = Path Text
+  | Dyn PieceType
+
+data PieceType
+  = Number
   | String
+  | NonEmpty PieceType
 
 isVariable :: RenderedPiece -> Bool
 isVariable (Path _) = False
-isVariable _        = True
+isVariable (Dyn _)  = True
 
 renderRoutePieces :: [Piece String] -> [RenderedPiece]
 renderRoutePieces = map renderRoutePiece
   where
     renderRoutePiece (Static st)   = Path $ T.dropAround (== '/') $ pack st
-    renderRoutePiece (Dynamic typ) = if isNumberType typ then Number else String
+    renderRoutePiece (Dynamic typ) = Dyn $ parseType typ
 
-    isNumberType "Int" = True
-    isNumberType type_ = "Id" `isSuffixOf` type_ -- UserId, PageId, PostId, etc.
+    parseType type_ =
+      maybe
+      (parseSimpleType type_)
+      (NonEmpty . parseType)
+      (L.stripPrefix "NonEmpty" type_) -- NonEmptyUserId ~ NonEmpty UserId
+
+    parseSimpleType "Int" = Number
+    parseSimpleType type_
+      | "Id" `isSuffixOf` type_ = Number -- UserId, PageId, PostId, etc.
+      | otherwise = String
 
 ----------------------------------------------------------------------
 
@@ -175,15 +188,39 @@ classMemberToFlowDef :: ClassMember -> Text
 classMemberToFlowDef ChildClass {..} = "  " <> cmField <> " : " <> cmClassName <> ";\n"
 classMemberToFlowDef Method {..}     = "  " <> cmField <> "(" <> args <> "): string { " <> body <> "; }\n"
   where
-    args = intercalate ", " $ zipWith render variableNames (filter isVariable cmPieces)
+    args = intercalate ", " $ zipWith render variableNames $ mapMaybe getType cmPieces
       where
-        render name typ = name <> ": " <> (case typ of { Number -> "number"; String -> "string" })
+        render name typ = name <> ": " <> argType typ
+
+        getType (Path _) = Nothing
+        getType (Dyn t)  = Just t
+
+        argType Number = "number"
+        argType String = "string"
+        argType (NonEmpty t) = "Array<" <> argType t <> ">"
 
     body = "return this.root + '" <> routeStr variableNames cmPieces <> "'"
       where
-        routeStr vars (Path p:rest) = (if null p then "" else "/" <> p) <> routeStr vars rest
-        routeStr (v:vars)  (_:rest) = "/' + " <> v <> ".toString() + '" <> routeStr vars rest
-        routeStr _         _        = ""
+        routeStr vars     (Path p:rest) = (if null p then "" else "/" <> p) <> routeStr vars rest
+        routeStr (v:vars) (Dyn t:rest)  = "/' + " <> convert v 0 t <> " + '" <> routeStr vars rest
+        routeStr _         _            = ""
+
+        convert v i String = name v i
+        convert v i Number = name v i <> ".toString()"
+        convert v i (NonEmpty t) =
+          T.concat
+            [ name v i
+            , ".map(function("
+            , name v (i + 1)
+            , ") { return "
+            , convert v (i + 1) t
+            , " }).join(',')"
+            ]
+
+        name :: Text -> Int -> Text
+        name v 0 = v
+        name v i = v <> pack (show i)
+
 
 classMemberToFlowInit :: ClassMember -> Text
 classMemberToFlowInit ChildClass {..} = "    this." <> cmField <> " = new " <> cmClassName <> "(root);\n"
