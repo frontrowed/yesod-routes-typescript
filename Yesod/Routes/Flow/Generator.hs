@@ -1,8 +1,15 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Yesod.Routes.Flow.Generator
-    ( genFlowRoutesPrefix
-    , genFlowRoutes
-    ) where
+  ( genFlowRoutes
+  , genFlowRoutesPrefix
+  , genFlowSource
+  , genFlowClasses
+  , classesToFlow
+  , Class(..)
+  , ClassMember(..)
+  , RenderedPiece(..)
+  , PieceType(..)
+  ) where
 
 import ClassyPrelude hiding (FilePath)
 import Data.Text (dropWhileEnd)
@@ -10,9 +17,9 @@ import Filesystem (createTree, writeTextFile)
 import Filesystem.Path (FilePath, directory)
 import Yesod.Routes.TH.Types
 import qualified Data.Char as C
+import qualified Data.List as L
 import qualified Data.Map  as M
 import qualified Data.Text as T
-
 
 genFlowRoutes :: [ResourceTree String] -> FilePath -> IO ()
 genFlowRoutes ra fp = genFlowRoutesPrefix [] [] ra fp "''"
@@ -20,25 +27,31 @@ genFlowRoutes ra fp = genFlowRoutesPrefix [] [] ra fp "''"
 genFlowRoutesPrefix :: [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
 genFlowRoutesPrefix routePrefixes elidedPrefixes fullTree fp prefix = do
     createTree $ directory fp
-    writeTextFile fp routesCs
-  where
-    routesCs =
-      let classes =
-            map disambiguateFields $
-            resourceTreeToClasses elidedPrefixes $
-            ResourceParent "paths" False [] hackedTree
-      in    "/* @flow */\n\n"
-         <> classesToFlow classes
-         <> "\n\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths(" <> prefix <> ");\n"
+    writeTextFile fp $ genFlowSource routePrefixes elidedPrefixes prefix fullTree
 
-    -- Route hackery.
-    landingRoutes = flip filter fullTree $ \case
-        ResourceParent _ _ _ _ -> False
-        ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
-    parents =
-        -- if routePrefixes is empty, include all routes
-        filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
-    hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
+genFlowSource :: [String] -> [String] -> Text -> [ResourceTree String] -> Text
+genFlowSource routePrefixes elidedPrefixes prefix fullTree =
+  mconcat
+    [ "/* @flow */\n\n"
+    , classesToFlow $ genFlowClasses routePrefixes elidedPrefixes fullTree
+    , "\n\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths(" <> prefix <> ");\n"
+    ]
+
+genFlowClasses :: [String] -> [String] -> [ResourceTree String] -> [Class]
+genFlowClasses routePrefixes elidedPrefixes fullTree =
+  map disambiguateFields $
+  resourceTreeToClasses elidedPrefixes $
+  ResourceParent "paths" False [] hackedTree
+ where
+  -- Route hackery.
+  landingRoutes = flip filter fullTree $ \case
+      ResourceParent _ _ _ _ -> False
+      ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
+  parents =
+      -- if routePrefixes is empty, include all routes
+      filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
+  hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
+
 
 parentName :: ResourceTree String -> String -> Bool
 parentName (ResourceParent n _ _ _) name = n == name
@@ -46,23 +59,37 @@ parentName _ _  = False
 
 ----------------------------------------------------------------------
 
-data RenderedPiece =
-    Path Text
-  | Number
-  | String
+data RenderedPiece
+  = Path Text
+  | Dyn PieceType
+    deriving (Eq, Show)
+
+data PieceType
+  = NumberT
+  | StringT
+  | NonEmptyT PieceType
+    deriving (Eq, Show)
 
 isVariable :: RenderedPiece -> Bool
 isVariable (Path _) = False
-isVariable _        = True
+isVariable (Dyn _)  = True
 
 renderRoutePieces :: [Piece String] -> [RenderedPiece]
 renderRoutePieces = map renderRoutePiece
   where
     renderRoutePiece (Static st)   = Path $ T.dropAround (== '/') $ pack st
-    renderRoutePiece (Dynamic typ) = if isNumberType typ then Number else String
+    renderRoutePiece (Dynamic typ) = Dyn $ parseType typ
 
-    isNumberType "Int" = True
-    isNumberType type_ = "Id" `isSuffixOf` type_ -- UserId, PageId, PostId, etc.
+    parseType type_ =
+      maybe
+      (parseSimpleType type_)
+      (NonEmptyT . parseType)
+      (L.stripPrefix "NonEmpty" type_) -- NonEmptyUserId ~ NonEmpty UserId
+
+    parseSimpleType "Int" = NumberT
+    parseSimpleType type_
+      | "Id" `isSuffixOf` type_ = NumberT -- UserId, PageId, PostId, etc.
+      | otherwise = StringT
 
 ----------------------------------------------------------------------
 
@@ -72,6 +99,7 @@ data Class =
     { className    :: Text
     , classMembers :: [ClassMember]
     }
+  deriving (Eq, Show)
 
 data ClassMember =
     -- | A 'ResourceParent' inside the 'ResourceParent'
@@ -85,6 +113,7 @@ data ClassMember =
       { cmField     :: Text            -- ^ Field name used to refer to the method.
       , cmPieces    :: [RenderedPiece] -- ^ Pieces to render the route.
       }
+    deriving (Eq, Show)
 
 variableCount :: ClassMember -> Int
 variableCount ChildClass {} = 0
@@ -175,15 +204,39 @@ classMemberToFlowDef :: ClassMember -> Text
 classMemberToFlowDef ChildClass {..} = "  " <> cmField <> " : " <> cmClassName <> ";\n"
 classMemberToFlowDef Method {..}     = "  " <> cmField <> "(" <> args <> "): string { " <> body <> "; }\n"
   where
-    args = intercalate ", " $ zipWith render variableNames (filter isVariable cmPieces)
+    args = intercalate ", " $ zipWith render variableNames $ mapMaybe getType cmPieces
       where
-        render name typ = name <> ": " <> (case typ of { Number -> "number"; String -> "string" })
+        render name typ = name <> ": " <> argType typ
+
+        getType (Path _) = Nothing
+        getType (Dyn t)  = Just t
+
+        argType NumberT = "number"
+        argType StringT = "string"
+        argType (NonEmptyT t) = "Array<" <> argType t <> ">"
 
     body = "return this.root + '" <> routeStr variableNames cmPieces <> "'"
       where
-        routeStr vars (Path p:rest) = (if null p then "" else "/" <> p) <> routeStr vars rest
-        routeStr (v:vars)  (_:rest) = "/' + " <> v <> ".toString() + '" <> routeStr vars rest
-        routeStr _         _        = ""
+        routeStr vars     (Path p:rest) = (if null p then "" else "/" <> p) <> routeStr vars rest
+        routeStr (v:vars) (Dyn t:rest)  = "/' + " <> convert v 0 t <> " + '" <> routeStr vars rest
+        routeStr _         _            = ""
+
+        convert v i StringT = name v i
+        convert v i NumberT = name v i <> ".toString()"
+        convert v i (NonEmptyT t) =
+          T.concat
+            [ name v i
+            , ".map(function("
+            , name v (i + 1)
+            , ") { return "
+            , convert v (i + 1) t
+            , " }).join(',')"
+            ]
+
+        name :: Text -> Int -> Text
+        name v 0 = v
+        name v i = v <> pack (show i)
+
 
 classMemberToFlowInit :: ClassMember -> Text
 classMemberToFlowInit ChildClass {..} = "    this." <> cmField <> " = new " <> cmClassName <> "(root);\n"
