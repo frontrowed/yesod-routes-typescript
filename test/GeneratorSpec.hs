@@ -38,27 +38,27 @@ spec = do
               "users"
               [ Path "api"
               , Path "users"
-              , Dyn Number
+              , Dyn NumberT
               ]
             , Method
               "users_bar"
               [ Path "api"
               , Path "users"
-              , Dyn (NonEmpty Number)
+              , Dyn (NonEmptyT NumberT)
               , Path "bar"
               ]
             , Method
               "users_baz"
               [ Path "api"
               , Path "users"
-              , Dyn String
+              , Dyn StringT
               , Path "baz"
               ]
             , Method
               "users_foo"
               [ Path "api"
               , Path "users"
-              , Dyn Number
+              , Dyn NumberT
               , Path "foo"
               ]
             ]
@@ -72,11 +72,11 @@ spec = do
             [ Method
               "y"
               [ Path "x"
-              , Dyn String
+              , Dyn StringT
               , Path "y"
-              , Dyn Number
+              , Dyn NumberT
               , Path "z"
-              , Dyn String
+              , Dyn StringT
               ]
             ]
           ]
@@ -99,7 +99,7 @@ spec = do
             [ Method
               "y"
               [ Path "x"
-              , Dyn (NonEmpty (NonEmpty Number))
+              , Dyn (NonEmptyT (NonEmptyT NumberT))
               , Path "y"
               ]
             ]

@@ -65,9 +65,9 @@ data RenderedPiece
     deriving (Eq, Show)
 
 data PieceType
-  = Number
-  | String
-  | NonEmpty PieceType
+  = NumberT
+  | StringT
+  | NonEmptyT PieceType
     deriving (Eq, Show)
 
 isVariable :: RenderedPiece -> Bool
@@ -83,13 +83,13 @@ renderRoutePieces = map renderRoutePiece
     parseType type_ =
       maybe
       (parseSimpleType type_)
-      (NonEmpty . parseType)
+      (NonEmptyT . parseType)
       (L.stripPrefix "NonEmpty" type_) -- NonEmptyUserId ~ NonEmpty UserId
 
-    parseSimpleType "Int" = Number
+    parseSimpleType "Int" = NumberT
     parseSimpleType type_
-      | "Id" `isSuffixOf` type_ = Number -- UserId, PageId, PostId, etc.
-      | otherwise = String
+      | "Id" `isSuffixOf` type_ = NumberT -- UserId, PageId, PostId, etc.
+      | otherwise = StringT
 
 ----------------------------------------------------------------------
 
@@ -211,9 +211,9 @@ classMemberToFlowDef Method {..}     = "  " <> cmField <> "(" <> args <> "): str
         getType (Path _) = Nothing
         getType (Dyn t)  = Just t
 
-        argType Number = "number"
-        argType String = "string"
-        argType (NonEmpty t) = "Array<" <> argType t <> ">"
+        argType NumberT = "number"
+        argType StringT = "string"
+        argType (NonEmptyT t) = "Array<" <> argType t <> ">"
 
     body = "return this.root + '" <> routeStr variableNames cmPieces <> "'"
       where
@@ -221,9 +221,9 @@ classMemberToFlowDef Method {..}     = "  " <> cmField <> "(" <> args <> "): str
         routeStr (v:vars) (Dyn t:rest)  = "/' + " <> convert v 0 t <> " + '" <> routeStr vars rest
         routeStr _         _            = ""
 
-        convert v i String = name v i
-        convert v i Number = name v i <> ".toString()"
-        convert v i (NonEmpty t) =
+        convert v i StringT = name v i
+        convert v i NumberT = name v i <> ".toString()"
+        convert v i (NonEmptyT t) =
           T.concat
             [ name v i
             , ".map(function("
