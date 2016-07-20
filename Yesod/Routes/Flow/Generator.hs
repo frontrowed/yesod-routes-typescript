@@ -1,8 +1,15 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Yesod.Routes.Flow.Generator
-    ( genFlowRoutesPrefix
-    , genFlowRoutes
-    ) where
+  ( genFlowRoutes
+  , genFlowRoutesPrefix
+  , genFlowSource
+  , genFlowClasses
+  , classesToFlow
+  , Class(..)
+  , ClassMember(..)
+  , RenderedPiece(..)
+  , PieceType(..)
+  ) where
 
 import ClassyPrelude hiding (FilePath)
 import Data.Text (dropWhileEnd)
@@ -14,32 +21,37 @@ import qualified Data.List as L
 import qualified Data.Map  as M
 import qualified Data.Text as T
 
-
 genFlowRoutes :: [ResourceTree String] -> FilePath -> IO ()
 genFlowRoutes ra fp = genFlowRoutesPrefix [] [] ra fp "''"
 
 genFlowRoutesPrefix :: [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
 genFlowRoutesPrefix routePrefixes elidedPrefixes fullTree fp prefix = do
     createTree $ directory fp
-    writeTextFile fp routesCs
-  where
-    routesCs =
-      let classes =
-            map disambiguateFields $
-            resourceTreeToClasses elidedPrefixes $
-            ResourceParent "paths" False [] hackedTree
-      in    "/* @flow */\n\n"
-         <> classesToFlow classes
-         <> "\n\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths(" <> prefix <> ");\n"
+    writeTextFile fp $ genFlowSource routePrefixes elidedPrefixes prefix fullTree
 
-    -- Route hackery.
-    landingRoutes = flip filter fullTree $ \case
-        ResourceParent _ _ _ _ -> False
-        ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
-    parents =
-        -- if routePrefixes is empty, include all routes
-        filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
-    hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
+genFlowSource :: [String] -> [String] -> Text -> [ResourceTree String] -> Text
+genFlowSource routePrefixes elidedPrefixes prefix fullTree =
+  mconcat
+    [ "/* @flow */\n\n"
+    , classesToFlow $ genFlowClasses routePrefixes elidedPrefixes fullTree
+    , "\n\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths(" <> prefix <> ");\n"
+    ]
+
+genFlowClasses :: [String] -> [String] -> [ResourceTree String] -> [Class]
+genFlowClasses routePrefixes elidedPrefixes fullTree =
+  map disambiguateFields $
+  resourceTreeToClasses elidedPrefixes $
+  ResourceParent "paths" False [] hackedTree
+ where
+  -- Route hackery.
+  landingRoutes = flip filter fullTree $ \case
+      ResourceParent _ _ _ _ -> False
+      ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
+  parents =
+      -- if routePrefixes is empty, include all routes
+      filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
+  hackedTree = ResourceParent "staticPages" False [] landingRoutes : parents
+
 
 parentName :: ResourceTree String -> String -> Bool
 parentName (ResourceParent n _ _ _) name = n == name
@@ -50,11 +62,13 @@ parentName _ _  = False
 data RenderedPiece
   = Path Text
   | Dyn PieceType
+    deriving (Eq, Show)
 
 data PieceType
   = Number
   | String
   | NonEmpty PieceType
+    deriving (Eq, Show)
 
 isVariable :: RenderedPiece -> Bool
 isVariable (Path _) = False
@@ -85,6 +99,7 @@ data Class =
     { className    :: Text
     , classMembers :: [ClassMember]
     }
+  deriving (Eq, Show)
 
 data ClassMember =
     -- | A 'ResourceParent' inside the 'ResourceParent'
@@ -98,6 +113,7 @@ data ClassMember =
       { cmField     :: Text            -- ^ Field name used to refer to the method.
       , cmPieces    :: [RenderedPiece] -- ^ Pieces to render the route.
       }
+    deriving (Eq, Show)
 
 variableCount :: ClassMember -> Int
 variableCount ChildClass {} = 0

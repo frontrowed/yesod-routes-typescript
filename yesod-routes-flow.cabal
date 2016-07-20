@@ -42,4 +42,39 @@ library
                         text,
                         yesod-core >= 1.4 && < 2.0
   -- hs-source-dirs:
-  default-language:    Haskell2010
+  default-language:     Haskell2010
+
+test-suite test
+  type:                 exitcode-stdio-1.0
+  main-is:              Spec.hs
+  hs-source-dirs:       test
+  other-modules:
+                        TestImport
+                        GeneratorSpec
+  default-extensions:
+                        ConstraintKinds,
+                        DeriveDataTypeable,
+                        ExtendedDefaultRules,
+                        FlexibleContexts,
+                        FlexibleInstances,
+                        LambdaCase,
+                        NoImplicitPrelude,
+                        OverloadedStrings,
+                        QuasiQuotes
+                        RecordWildCards,
+                        ScopedTypeVariables,
+                        StandaloneDeriving,
+                        TemplateHaskell,
+                        TupleSections,
+                        TypeSynonymInstances
+  build-depends:
+                        base < 5,
+                        yesod-routes-flow,
+                        classy-prelude >= 0.7,
+                        hspec,
+                        hspec-expectations,
+                        semigroups,
+                        shakespeare,
+                        text,
+                        yesod-core >= 1.4 && < 2.0
+  default-language:     Haskell2010
