@@ -1,0 +1,29 @@
+machine:
+  ghc:
+    version: 7.10.2
+  environment:
+    PATH: "$HOME/.local/bin:$PATH"
+    STACK_VERSION: 1.1.2
+
+general:
+  artifacts:
+    - "~/yesod-routes-flow/.stack-work/logs"
+
+dependencies:
+  pre:
+    - mkdir -p ~/.local/bin
+    - curl -L https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar -xzv -C ~/.local/bin && ln -vsf ~/.local/bin/stack-*/stack ~/.local/bin/stack
+  cache_directories:
+    - "~/.stack"
+    - "~/yesod-routes-flow/.stack-work"
+  override:
+    - sudo update-alternatives --set gcc /usr/bin/gcc-4.6 # Remove these once Circle CI's GCC 4.9
+    - sudo update-alternatives --set g++ /usr/bin/g++-4.6 # start working with --coverage.
+    - stack setup
+    - stack build --jobs=1 --test --only-dependencies --no-run-tests:
+        timeout: 3600
+
+test:
+  override:
+    - stack build --jobs=1 --pedantic --test:
+        timeout: 3600
