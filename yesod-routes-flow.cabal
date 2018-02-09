@@ -76,5 +76,6 @@ test-suite test
                         semigroups,
                         shakespeare,
                         text,
+                        containers,
                         yesod-core >= 1.4 && < 2.0
   default-language:     Haskell2010

@@ -1,6 +1,7 @@
 module GeneratorSpec where
 
 import TestImport
+import qualified Data.Map as M
 import Data.List.NonEmpty (NonEmpty(..))
 
 type UserId = Int
@@ -19,7 +20,7 @@ spec :: Spec
 spec = do
   describe "genFlowClasses" $ do
     it "should generate classes" $ do
-      let classes = genFlowClasses [] [] resources
+      let classes = genFlowClasses M.empty [] [] resources
       map className classes
         `shouldBe`
           [ "PATHS_TYPE_paths"
@@ -29,7 +30,7 @@ spec = do
 
     it "should identify path variable types" $ do
       let
-        classes = genFlowClasses [] [] resources
+        classes = genFlowClasses M.empty [] [] resources
         apiClass = find ((== "PATHS_TYPE_paths_api") . className) classes
       map classMembers apiClass
         `shouldBe`
@@ -62,7 +63,41 @@ spec = do
               , Path "foo"
               ]
             ]
-
+    it "should respect overrides " $ do
+      let
+        classes = genFlowClasses (M.fromList [("UserId", StringT)]) [] [] resources
+        apiClass = find ((== "PATHS_TYPE_paths_api") . className) classes
+      map classMembers apiClass
+        `shouldBe`
+          Just
+            [ Method
+              "users"
+              [ Path "api"
+              , Path "users"
+              , Dyn StringT
+              ]
+            , Method
+              "users_bar"
+              [ Path "api"
+              , Path "users"
+              , Dyn (NonEmptyT StringT)
+              , Path "bar"
+              ]
+            , Method
+              "users_baz"
+              [ Path "api"
+              , Path "users"
+              , Dyn StringT
+              , Path "baz"
+              ]
+            , Method
+              "users_foo"
+              [ Path "api"
+              , Path "users"
+              , Dyn NumberT
+              , Path "foo"
+              ]
+            ]
   describe "classesToFlow" $ do
     it "should generate formal parameters for each path variable" $ do
       let
@@ -118,7 +153,7 @@ spec = do
 
   describe "genFlowSource" $
     it "should work end-to-end" $ do
-      let source = genFlowSource [] [] "'test'" resources
+      let source = genFlowSource M.empty [] [] "'test'" resources
       normalizeText source
         `shouldBe`
           normalizeText [st|
