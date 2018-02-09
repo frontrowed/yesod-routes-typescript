@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Yesod.Routes.Flow.Generator
   ( genFlowRoutes
@@ -13,15 +13,15 @@ module Yesod.Routes.Flow.Generator
   , PieceType(..)
   ) where
 
-import           ClassyPrelude         hiding (FilePath)
-import qualified Data.Char             as C
-import qualified Data.List             as L
-import qualified Data.Map              as M
-import           Data.Text             (dropWhileEnd)
-import qualified Data.Text             as T
-import           Filesystem            (createTree, writeTextFile)
-import           Filesystem.Path       (FilePath, directory)
-import           Yesod.Routes.TH.Types
+import ClassyPrelude hiding (FilePath)
+import qualified Data.Char as C
+import qualified Data.List as L
+import qualified Data.Map as M
+import Data.Text (dropWhileEnd)
+import qualified Data.Text as T
+import Filesystem (createTree, writeTextFile)
+import Filesystem.Path (FilePath, directory)
+import Yesod.Routes.TH.Types
 
 -- An override map from Haskell type name to Flow type name
 type Overrides = M.Map String PieceType
