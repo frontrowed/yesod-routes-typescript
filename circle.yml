@@ -3,7 +3,7 @@ machine:
     version: 7.10.2
   environment:
     PATH: "$HOME/.local/bin:$PATH"
-    STACK_VERSION: 1.1.2
+    STACK_VERSION: 1.6.1
 
 general:
   artifacts:
@@ -17,8 +17,6 @@ dependencies:
     - "~/.stack"
     - "~/yesod-routes-flow/.stack-work"
   override:
-    - sudo update-alternatives --set gcc /usr/bin/gcc-4.6 # Remove these once Circle CI's GCC 4.9
-    - sudo update-alternatives --set g++ /usr/bin/g++-4.6 # start working with --coverage.
     - stack setup
     - stack build --jobs=1 --test --only-dependencies --no-run-tests:
         timeout: 3600

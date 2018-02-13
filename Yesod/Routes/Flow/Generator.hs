@@ -1,4 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 module Yesod.Routes.Flow.Generator
   ( genFlowRoutes
   , genFlowRoutesPrefix
@@ -12,35 +14,38 @@ module Yesod.Routes.Flow.Generator
   ) where
 
 import ClassyPrelude hiding (FilePath)
+import qualified Data.Char as C
+import qualified Data.List as L
+import qualified Data.Map as M
 import Data.Text (dropWhileEnd)
+import qualified Data.Text as T
 import Filesystem (createTree, writeTextFile)
 import Filesystem.Path (FilePath, directory)
 import Yesod.Routes.TH.Types
-import qualified Data.Char as C
-import qualified Data.List as L
-import qualified Data.Map  as M
-import qualified Data.Text as T
+
+-- An override map from Haskell type name to Flow type name
+type Overrides = M.Map String PieceType
 
 genFlowRoutes :: [ResourceTree String] -> FilePath -> IO ()
-genFlowRoutes ra fp = genFlowRoutesPrefix [] [] ra fp "''"
+genFlowRoutes ra fp = genFlowRoutesPrefix M.empty [] [] ra fp "''"
 
-genFlowRoutesPrefix :: [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
-genFlowRoutesPrefix routePrefixes elidedPrefixes fullTree fp prefix = do
+genFlowRoutesPrefix :: Overrides -> [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
+genFlowRoutesPrefix overrides routePrefixes elidedPrefixes fullTree fp prefix = do
     createTree $ directory fp
-    writeTextFile fp $ genFlowSource routePrefixes elidedPrefixes prefix fullTree
+    writeTextFile fp $ genFlowSource overrides routePrefixes elidedPrefixes prefix fullTree
 
-genFlowSource :: [String] -> [String] -> Text -> [ResourceTree String] -> Text
-genFlowSource routePrefixes elidedPrefixes prefix fullTree =
+genFlowSource :: Overrides -> [String] -> [String] -> Text -> [ResourceTree String] -> Text
+genFlowSource overrides routePrefixes elidedPrefixes prefix fullTree =
   mconcat
     [ "/* @flow */\n\n"
-    , classesToFlow $ genFlowClasses routePrefixes elidedPrefixes fullTree
+    , classesToFlow $ genFlowClasses overrides routePrefixes elidedPrefixes fullTree
     , "\n\nvar PATHS: PATHS_TYPE_paths = new PATHS_TYPE_paths(" <> prefix <> ");\n"
     ]
 
-genFlowClasses :: [String] -> [String] -> [ResourceTree String] -> [Class]
-genFlowClasses routePrefixes elidedPrefixes fullTree =
+genFlowClasses :: Overrides -> [String] -> [String] -> [ResourceTree String] -> [Class]
+genFlowClasses overrides routePrefixes elidedPrefixes fullTree =
   map disambiguateFields $
-  resourceTreeToClasses elidedPrefixes $
+  resourceTreeToClasses overrides elidedPrefixes $
   ResourceParent "paths" False [] hackedTree
  where
   -- Route hackery.
@@ -55,7 +60,7 @@ genFlowClasses routePrefixes elidedPrefixes fullTree =
 
 parentName :: ResourceTree String -> String -> Bool
 parentName (ResourceParent n _ _ _) name = n == name
-parentName _ _  = False
+parentName _ _                           = False
 
 ----------------------------------------------------------------------
 
@@ -74,17 +79,19 @@ isVariable :: RenderedPiece -> Bool
 isVariable (Path _) = False
 isVariable (Dyn _)  = True
 
-renderRoutePieces :: [Piece String] -> [RenderedPiece]
-renderRoutePieces = map renderRoutePiece
+renderRoutePieces :: Overrides -> [Piece String] -> [RenderedPiece]
+renderRoutePieces overrides = map renderRoutePiece
   where
     renderRoutePiece (Static st)   = Path $ T.dropAround (== '/') $ pack st
     renderRoutePiece (Dynamic typ) = Dyn $ parseType typ
 
     parseType type_ =
-      maybe
-      (parseSimpleType type_)
-      (NonEmptyT . parseType)
-      (L.stripPrefix "NonEmpty" type_) -- NonEmptyUserId ~ NonEmpty UserId
+      fromMaybe
+        (maybe
+          (parseSimpleType type_)
+          (NonEmptyT . parseType)
+          (L.stripPrefix "NonEmpty" type_)) -- NonEmptyUserId ~ NonEmpty UserId
+        $ M.lookup type_ overrides
 
     parseSimpleType "Int" = NumberT
     parseSimpleType type_
@@ -110,8 +117,8 @@ data ClassMember =
       }
     -- | A callable method.
   | Method
-      { cmField     :: Text            -- ^ Field name used to refer to the method.
-      , cmPieces    :: [RenderedPiece] -- ^ Pieces to render the route.
+      { cmField  :: Text            -- ^ Field name used to refer to the method.
+      , cmPieces :: [RenderedPiece] -- ^ Pieces to render the route.
       }
     deriving (Eq, Show)
 
@@ -125,8 +132,8 @@ variableNames = T.cons <$> ['a'..'z'] <*> ("" : variableNames)
 ----------------------------------------------------------------------
 
 -- | Create a list of 'Class'es from a 'ResourceTree'.
-resourceTreeToClasses :: [String] -> ResourceTree String -> [Class]
-resourceTreeToClasses elidedPrefixes = finish . go Nothing []
+resourceTreeToClasses :: Overrides -> [String] -> ResourceTree String -> [Class]
+resourceTreeToClasses overrides elidedPrefixes = finish . go Nothing []
   where
     finish (Right (_, classes)) = classes
     finish (Left _)             = []
@@ -140,13 +147,13 @@ resourceTreeToClasses elidedPrefixes = finish . go Nothing []
             fullName = intercalate "_" [pack st :: Text | Static st <- resourcePieces res]
         return Method
           { cmField       = if null fullName then "_" else resName
-          , cmPieces      = routePrefix <> renderRoutePieces (resourcePieces res) }
+          , cmPieces      = routePrefix <> renderRoutePieces overrides (resourcePieces res) }
     go parent routePrefix (ResourceParent name _ pieces children) =
       let elideThisPrefix = name `elem` elidedPrefixes
           pref            = cleanName $ pack name
           jsName          = maybe "" (<> "_") parent <> pref
           newParent       = if elideThisPrefix then parent else Just jsName
-          newRoutePrefix  = routePrefix <> renderRoutePieces pieces
+          newRoutePrefix  = routePrefix <> renderRoutePieces overrides pieces
           membersMethods  = catMaybes childrenMethods
           (childrenMethods, childrenClasses) = partitionEithers $ map (go newParent newRoutePrefix) children
           (membersClasses, moreClasses)      = concat *** concat $ unzip childrenClasses
@@ -211,8 +218,8 @@ classMemberToFlowDef Method {..}     = "  " <> cmField <> "(" <> args <> "): str
         getType (Path _) = Nothing
         getType (Dyn t)  = Just t
 
-        argType NumberT = "number"
-        argType StringT = "string"
+        argType NumberT       = "number"
+        argType StringT       = "string"
         argType (NonEmptyT t) = "Array<" <> argType t <> ">"
 
     body = "return this.root + '" <> routeStr variableNames cmPieces <> "'"
