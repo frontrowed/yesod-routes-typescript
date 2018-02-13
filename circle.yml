@@ -3,7 +3,7 @@ machine:
     version: 7.10.2
   environment:
     PATH: "$HOME/.local/bin:$PATH"
-    STACK_VERSION: 1.5.1
+    STACK_VERSION: 1.6.1
 
 general:
   artifacts:
