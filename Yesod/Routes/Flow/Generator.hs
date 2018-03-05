@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Yesod.Routes.Flow.Generator
@@ -264,5 +265,7 @@ classToFlow Class {..} =
 classesToFlow :: [Class] -> Text
 classesToFlow = intercalate "\n" . map classToFlow
 
+#if !MIN_VERSION_yesod_core(1, 6, 2)
 deriving instance (Show a) => Show (ResourceTree a)
 deriving instance (Show a) => Show (FlatResource a)
+#endif

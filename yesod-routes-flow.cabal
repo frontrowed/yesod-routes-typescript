@@ -1,5 +1,5 @@
 name:                yesod-routes-flow
-version:             3.0
+version:             3.0.0.1
 synopsis:            Generate Flow routes for Yesod
 description:         Parse the Yesod routes data structure and generate routes that can be used with Flow.
 homepage:            https://github.com/frontrowed/yesod-routes-flow
@@ -10,7 +10,7 @@ maintainer:          Greg Weber <greg@frontrowed.com>
 -- copyright:
 category:            Web
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files:  README.md Changelog.md
 cabal-version:       >=1.10
 
 library
