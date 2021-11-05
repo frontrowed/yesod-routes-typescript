@@ -3,7 +3,7 @@ version: 3.0.0.1
 category: Web
 author: Freckle Engineering
 maintainer: engineering@freckle.com
-copyright: 2021 Freckle Education
+copyright: 2021 Renaissance Learning Inc
 homepage: https://github.com/freckle/yesod-routes-flow
 license: MIT
 github: freckle/yesod-routes-flow
@@ -42,7 +42,7 @@ default-extensions:
   - TypeSynonymInstances
 
 library:
-  exposed-modules:     Yesod.Routes.Flow.Generator
+  exposed-modules: Yesod.Routes.Flow.Generator
   dependencies:
     - base < 5
     - attoparsec
