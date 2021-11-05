@@ -42,7 +42,7 @@ default-extensions:
   - TypeSynonymInstances
 
 library:
-  exposed-modules:     Yesod.Routes.Flow.Generator
+  exposed-modules: Yesod.Routes.Flow.Generator
   dependencies:
     - base < 5
     - attoparsec
