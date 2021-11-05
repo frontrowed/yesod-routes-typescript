@@ -17,4 +17,4 @@ import Yesod.Routes.TH.Types (ResourceTree(..))
 
 -- Avoid having to exactly compare leading whitespace or empty lines
 normalizeText :: Text -> Text
-normalizeText = T.unlines . filter (/="") . (map T.strip) . T.lines
+normalizeText = T.unlines . filter (/="") . map T.strip . T.lines

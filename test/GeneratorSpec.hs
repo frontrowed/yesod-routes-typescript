@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module GeneratorSpec where
 
 import TestImport

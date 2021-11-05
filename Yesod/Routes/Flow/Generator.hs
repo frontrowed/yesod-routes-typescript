@@ -51,8 +51,8 @@ genFlowClasses overrides routePrefixes elidedPrefixes fullTree =
  where
   -- Route hackery.
   landingRoutes = flip filter fullTree $ \case
-      ResourceParent _ _ _ _ -> False
-      ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
+      ResourceParent {} -> False
+      ResourceLeaf res -> notElem (resourceName res) ["AuthR", "StaticR"]
   parents =
       -- if routePrefixes is empty, include all routes
       filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
@@ -174,7 +174,7 @@ resourceTreeToClasses overrides elidedPrefixes = finish . go Nothing []
 
 cleanName :: Text -> Text
 cleanName = underscorize . uncapitalize . dropWhileEnd C.isUpper
-  where uncapitalize t = (toLower $ take 1 t) <> drop 1 t
+  where uncapitalize t = toLower (take 1 t) <> drop 1 t
         underscorize = T.pack . go . T.unpack
           where go (c:cs) | C.isUpper c = '_' : C.toLower c : go cs
                           | otherwise   =  c                : go cs
@@ -190,7 +190,7 @@ disambiguateFields klass = klass { classMembers = processMembers $ classMembers 
     fromMap  = concat . M.elems
     toMap    = M.fromListWith (++) . labelled
     labelled = map (cmField &&& return)
-    append t = \cm -> cm { cmField = cmField cm <> t cm }
+    append t cm = cm { cmField = cmField cm <> t cm }
 
     disambiguate :: ([ClassMember] -> [ClassMember]) -> M.Map Text [ClassMember] -> M.Map Text [ClassMember]
     disambiguate inner = M.fromListWith (++) . concatMap f . M.toList
