@@ -17,7 +17,7 @@ module Yesod.Routes.Flow.Generator
 import ClassyPrelude hiding (FilePath)
 import qualified Data.Char as C
 import qualified Data.List as L
-import qualified Data.Map as M
+import qualified Data.Map as Map
 import Data.Text (dropWhileEnd)
 import qualified Data.Text as T
 import Filesystem (createTree, writeTextFile)
@@ -25,10 +25,10 @@ import Filesystem.Path (FilePath, directory)
 import Yesod.Routes.TH.Types
 
 -- An override map from Haskell type name to Flow type name
-type Overrides = M.Map String PieceType
+type Overrides = Map.Map String PieceType
 
 genFlowRoutes :: [ResourceTree String] -> FilePath -> IO ()
-genFlowRoutes ra fp = genFlowRoutesPrefix M.empty [] [] ra fp "''"
+genFlowRoutes ra fp = genFlowRoutesPrefix Map.empty [] [] ra fp "''"
 
 genFlowRoutesPrefix :: Overrides -> [String] -> [String] -> [ResourceTree String] -> FilePath -> Text -> IO ()
 genFlowRoutesPrefix overrides routePrefixes elidedPrefixes fullTree fp prefix = do
@@ -51,8 +51,8 @@ genFlowClasses overrides routePrefixes elidedPrefixes fullTree =
  where
   -- Route hackery.
   landingRoutes = flip filter fullTree $ \case
-      ResourceParent _ _ _ _ -> False
-      ResourceLeaf res -> not $ elem (resourceName res) ["AuthR", "StaticR"]
+      ResourceParent {} -> False
+      ResourceLeaf res  -> notElem (resourceName res) ["AuthR", "StaticR"]
   parents =
       -- if routePrefixes is empty, include all routes
       filter (\n -> null routePrefixes || any (parentName n) routePrefixes) fullTree
@@ -92,7 +92,7 @@ renderRoutePieces overrides = map renderRoutePiece
           (parseSimpleType type_)
           (NonEmptyT . parseType)
           (L.stripPrefix "NonEmpty" type_)) -- NonEmptyUserId ~ NonEmpty UserId
-        $ M.lookup type_ overrides
+        $ Map.lookup type_ overrides
 
     parseSimpleType "Int" = NumberT
     parseSimpleType type_
@@ -142,11 +142,11 @@ resourceTreeToClasses overrides elidedPrefixes = finish . go Nothing []
     go :: Maybe Text -> [RenderedPiece] -> ResourceTree String -> Either (Maybe ClassMember) ([ClassMember], [Class])
     go _parent routePrefix (ResourceLeaf res) =
       Left $ do
-        Methods _ methods <- return $ resourceDispatch res -- Ignore subsites.
+        Methods _ methods <- pure $ resourceDispatch res -- Ignore subsites.
         guard (not $ null methods) -- Silently ignore routes without methods.
         let resName  = T.replace "." "" $ T.replace "-" "_" fullName
             fullName = intercalate "_" [pack st :: Text | Static st <- resourcePieces res]
-        return Method
+        pure Method
           { cmField       = if null fullName then "_" else resName
           , cmPieces      = routePrefix <> renderRoutePieces overrides (resourcePieces res) }
     go parent routePrefix (ResourceParent name _ pieces children) =
@@ -174,7 +174,7 @@ resourceTreeToClasses overrides elidedPrefixes = finish . go Nothing []
 
 cleanName :: Text -> Text
 cleanName = underscorize . uncapitalize . dropWhileEnd C.isUpper
-  where uncapitalize t = (toLower $ take 1 t) <> drop 1 t
+  where uncapitalize t = toLower (take 1 t) <> drop 1 t
         underscorize = T.pack . go . T.unpack
           where go (c:cs) | C.isUpper c = '_' : C.toLower c : go cs
                           | otherwise   =  c                : go cs
@@ -187,13 +187,13 @@ disambiguateFields :: Class -> Class
 disambiguateFields klass = klass { classMembers = processMembers $ classMembers klass }
   where
     processMembers = fromMap . disambiguate viaLetters . disambiguate viaArgCount . toMap
-    fromMap  = concat . M.elems
-    toMap    = M.fromListWith (++) . labelled
-    labelled = map (cmField &&& return)
-    append t = \cm -> cm { cmField = cmField cm <> t cm }
+    fromMap  = concat . Map.elems
+    toMap    = Map.fromListWith (++) . labelled
+    labelled = map (cmField &&& pure)
+    append t cm = cm { cmField = cmField cm <> t cm }
 
-    disambiguate :: ([ClassMember] -> [ClassMember]) -> M.Map Text [ClassMember] -> M.Map Text [ClassMember]
-    disambiguate inner = M.fromListWith (++) . concatMap f . M.toList
+    disambiguate :: ([ClassMember] -> [ClassMember]) -> Map.Map Text [ClassMember] -> Map.Map Text [ClassMember]
+    disambiguate inner = Map.fromListWith (++) . concatMap f . Map.toList
       where
         f :: (Text, [ClassMember]) -> [(Text, [ClassMember])]
         f y@(_, [ ]) = [y]
