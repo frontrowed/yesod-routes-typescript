@@ -4,7 +4,7 @@ cabal-version: 1.18
 --
 -- see: https://github.com/sol/hpack
 
-name:           yesod-routes-flow
+name:           yesod-routes-flowtype
 version:        3.0.0.1
 synopsis:       Generate Flow routes for Yesod
 description:    Parse the Yesod routes data structure and generate routes that can be used with Flow.
@@ -29,7 +29,7 @@ library
   exposed-modules:
       Yesod.Routes.Flow.Generator
   other-modules:
-      Paths_yesod_routes_flow
+      Paths_yesod_routes_flowtype
   default-extensions:
       ConstraintKinds,
       DeriveDataTypeable,
@@ -62,7 +62,7 @@ test-suite spec
   other-modules:
       GeneratorSpec
       TestImport
-      Paths_yesod_routes_flow
+      Paths_yesod_routes_flowtype
   hs-source-dirs:
       test
   default-extensions:
@@ -93,5 +93,5 @@ test-suite spec
     , system-filepath >=0.4
     , text
     , yesod-core >=1.4 && <2.0
-    , yesod-routes-flow
+    , yesod-routes-flowtype
   default-language: Haskell2010

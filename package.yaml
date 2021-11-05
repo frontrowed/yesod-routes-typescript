@@ -1,4 +1,4 @@
-name: yesod-routes-flow
+name: yesod-routes-flowtype
 version: 3.0.0.1
 category: Web
 author: Freckle Engineering
@@ -59,7 +59,7 @@ tests:
     source-dirs: test
     dependencies:
       - base < 5
-      - yesod-routes-flow
+      - yesod-routes-flowtype
       - classy-prelude >= 0.7
       - hspec
       - hspec-expectations
