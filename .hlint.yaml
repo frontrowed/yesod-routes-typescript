@@ -20,30 +20,21 @@
 
 # Specify additional command line arguments
 - arguments:
-  - -XBangPatterns
-  - -XDataKinds
-  - -XDeriveAnyClass
-  - -XDeriveFoldable
-  - -XDeriveFunctor
-  - -XDeriveGeneric
-  - -XDeriveLift
-  - -XDeriveTraversable
-  - -XDerivingStrategies
+  - -XConstraintKinds
+  - -XDeriveDataTypeable
+  - -XExtendedDefaultRules
   - -XFlexibleContexts
   - -XFlexibleInstances
-  - -XGADTs
-  - -XGeneralizedNewtypeDeriving
   - -XLambdaCase
-  - -XMultiParamTypeClasses
   - -XNoImplicitPrelude
-  - -XNoMonomorphismRestriction
   - -XOverloadedStrings
-  - -XRankNTypes
+  - -XQuasiQuotes
   - -XRecordWildCards
   - -XScopedTypeVariables
   - -XStandaloneDeriving
-  - -XTypeApplications
-  - -XTypeFamilies
+  - -XTemplateHaskell
+  - -XTupleSections
+  - -XTypeSynonymInstances
 
 - modules:
   - {name: [Data.Set], as: Set}

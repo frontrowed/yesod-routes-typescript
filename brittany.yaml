@@ -22,6 +22,7 @@ conf_forward:
     - -XDeriveGeneric
     - -XDeriveLift
     - -XDeriveTraversable
+    - -XDerivingStrategies
     - -XFlexibleContexts
     - -XFlexibleInstances
     - -XGADTs
