@@ -3,7 +3,7 @@
 module GeneratorSpec where
 
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.Map as M
+import qualified Data.Map as Map
 import TestImport
 
 type UserId = Int
@@ -22,7 +22,7 @@ spec :: Spec
 spec = do
   describe "genFlowClasses" $ do
     it "should generate classes" $ do
-      let classes = genFlowClasses M.empty [] [] resources
+      let classes = genFlowClasses Map.empty [] [] resources
       map className classes
         `shouldBe`
           [ "PATHS_TYPE_paths"
@@ -32,7 +32,7 @@ spec = do
 
     it "should identify path variable types" $ do
       let
-        classes = genFlowClasses M.empty [] [] resources
+        classes = genFlowClasses Map.empty [] [] resources
         apiClass = find ((== "PATHS_TYPE_paths_api") . className) classes
       map classMembers apiClass
         `shouldBe`
@@ -67,7 +67,7 @@ spec = do
             ]
     it "should respect overrides " $ do
       let
-        classes = genFlowClasses (M.fromList [("UserId", StringT)]) [] [] resources
+        classes = genFlowClasses (Map.fromList [("UserId", StringT)]) [] [] resources
         apiClass = find ((== "PATHS_TYPE_paths_api") . className) classes
       map classMembers apiClass
         `shouldBe`
@@ -155,7 +155,7 @@ spec = do
 
   describe "genFlowSource" $
     it "should work end-to-end" $ do
-      let source = genFlowSource M.empty [] [] "'test'" resources
+      let source = genFlowSource Map.empty [] [] "'test'" resources
       normalizeText source
         `shouldBe`
           normalizeText [st|
