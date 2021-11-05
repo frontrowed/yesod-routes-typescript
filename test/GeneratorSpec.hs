@@ -2,9 +2,9 @@
 
 module GeneratorSpec where
 
-import           Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.Map           as M
-import           TestImport
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.Map as M
+import TestImport
 
 type UserId = Int
 type NonEmptyUserId = NonEmpty UserId
