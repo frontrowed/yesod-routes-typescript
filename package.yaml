@@ -1,0 +1,70 @@
+name: yesod-routes-flow
+version: 3.0.0.1
+category: Web
+author: Freckle Engineering
+maintainer: engineering@freckle.com
+copyright: 2021 Renaissance Learning Inc
+homepage: https://github.com/freckle/yesod-routes-flow
+license: MIT
+github: freckle/yesod-routes-flow
+synopsis: Generate Flow routes for Yesod
+description: |
+  Parse the Yesod routes data structure and generate routes that can be used with Flow.
+
+extra-doc-files:
+  - Changelog.md
+  - README.md
+
+dependencies:
+  - base < 5
+  - attoparsec
+  - classy-prelude >= 0.7
+  - system-fileio
+  - system-filepath >= 0.4
+  - containers
+  - text
+  - yesod-core >= 1.4 && < 2.0
+
+default-extensions:
+  - ConstraintKinds,
+  - DeriveDataTypeable,
+  - ExtendedDefaultRules,
+  - FlexibleContexts,
+  - FlexibleInstances,
+  - LambdaCase,
+  - NoImplicitPrelude,
+  - OverloadedStrings,
+  - RecordWildCards,
+  - ScopedTypeVariables,
+  - StandaloneDeriving,
+  - TemplateHaskell,
+  - TupleSections,
+  - TypeSynonymInstances
+
+library:
+  exposed-modules: Yesod.Routes.Flow.Generator
+  dependencies:
+    - base < 5
+    - attoparsec
+    - classy-prelude >= 0.7
+    - system-fileio
+    - system-filepath >= 0.4
+    - containers
+    - text
+    - yesod-core >= 1.4 && < 2.0
+
+tests:
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - base < 5
+      - yesod-routes-flow
+      - classy-prelude >= 0.7
+      - hspec
+      - hspec-expectations
+      - semigroups
+      - shakespeare
+      - text
+      - containers
+      - yesod-core >= 1.4 && < 2.0
