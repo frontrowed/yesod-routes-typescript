@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           yesod-routes-flow
-version:        3.0.0.1
+version:        3.0.0.2
 synopsis:       Generate Flow routes for Yesod
 description:    Parse the Yesod routes data structure and generate routes that can be used with Flow.
 category:       Web

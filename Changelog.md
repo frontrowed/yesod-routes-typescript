@@ -1,6 +1,10 @@
-## [_Unreleased_](https://github.com/freckle/yesod-routes-flow/compare/v3.0.0.1...main)
+## [_Unreleased_](https://github.com/freckle/yesod-routes-flow/compare/v3.0.0.2...main)
 
 None
+
+## [v3.0.0.2](https://github.com/freckle/yesod-routes-flow/compare/v3.0.0.1...v3.0.0.2)
+
+- Support GHCs 9.0 and 9.2
 
 ## [v3.0.0.1](https://github.com/freckle/yesod-routes-flow/compare/2.0...v3.0.0.1)
 
